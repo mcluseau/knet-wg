@@ -29,8 +29,9 @@ func writeCNIConfig(node *v1.Node, iface *net.Interface) {
 	}
 
 	ba, err := json.MarshalIndent(map[string]interface{}{
-		"name": "knet-wg",
-		"type": "ptp",
+		"cniVersion": "0.3.1",
+		"name":       "knet-wg",
+		"type":       "ptp",
 		"ipam": map[string]interface{}{
 			"type":   "host-local",
 			"ranges": ranges,
