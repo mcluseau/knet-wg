@@ -1,0 +1,120 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knet-wg
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: kube-system
+  name: knet-wg
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: knet-wg
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: knet-wg
+subjects:
+- kind: ServiceAccount
+  name: knet-wg
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeconfig
+  namespace: kube-system
+data:
+  kubeconfig.conf: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+        certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        # you need to resolve kubernetes to your API server
+        server: https://kubernetes:6443
+      name: default
+    users:
+    - name: default
+      user:
+        tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    contexts:
+    - context:
+        cluster: default
+        namespace: default
+        user: default
+      name: default
+    current-context: default
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: kube-system
+  name: knet-wg
+spec:
+  selector:
+    matchLabels: { app: knet-wg }
+  template:
+    metadata:
+      labels: { app: knet-wg }
+    spec:
+      tolerations:
+      - operator: "Exists"
+        effect: "NoSchedule"
+      serviceAccountName: knet-wg
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      containers:
+      - name: knet-wg
+        image: mcluseau/knet-wg
+        args:
+        - --key-path=/etc/knet-wg/wg.key
+        - --kubeconfig=/run/k8s/kubeconfig.conf # to work without kube-proxy, be sure to define the kubernetes host
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni
+        - name: wg
+          mountPath: /etc/wireguard
+        - name: modules
+          mountPath: /lib/modules
+        - name: knet-wg
+          mountPath: /etc/knet-wg
+        - name: k8s
+          mountPath: /run/k8s
+      volumes:
+      - name: cni
+        hostPath:
+          path: /etc/cni
+      - name: wg
+        hostPath:
+          path: /etc/wireguard
+      - name: modules
+        hostPath:
+          path: /lib/modules
+      - name: knet-wg
+        hostPath:
+          path: /var/lib/kubelet/knet-wg
+      # enable to work with a custom kubeconfig
+      - name: k8s
+        configMap:
+          name: kubeconfig
