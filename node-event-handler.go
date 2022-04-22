@@ -130,9 +130,13 @@ func (neh *nodeEventHandler) updateWG() {
 	}
 
 	// sync IPs
-	iface, _ := net.InterfaceByName(ifName)
-	if node, nodeFound := neh.nodes[*nodeName]; iface != nil && nodeFound {
-		syncNodeIPs(node.PodCIDRs, iface)
+	if node, nodeFound := neh.nodes[*nodeName]; nodeFound {
+		iface, _ := net.InterfaceByName(ifName)
+		if iface != nil {
+			syncNodeIPs(node.PodCIDRs, iface)
+		}
+
+		setupNFT(node.PodCIDRs)
 	}
 
 	// check routes exist
