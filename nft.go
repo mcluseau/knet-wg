@@ -52,6 +52,7 @@ delete table ip knet_wg;
 table ip knet_wg {
   chain hook_postrouting {
     type nat hook postrouting priority 999;
+    fib saddr type local oif "` + *ifName + `" masquerade;
 `)
 
 	for _, cidr := range podCIDRs {

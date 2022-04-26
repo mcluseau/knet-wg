@@ -43,7 +43,7 @@ func syncNodeIPs(podCIDRs []string, iface *net.Interface) {
 			}
 
 			log.Print("==> adding IP ", ipMask)
-			run("ip", "addr", "add", ipMask, "dev", ifName)
+			run("ip", "addr", "add", ipMask, "dev", *ifName)
 		}
 	}
 }

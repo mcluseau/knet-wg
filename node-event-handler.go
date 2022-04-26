@@ -124,14 +124,14 @@ func (neh *nodeEventHandler) updateWG() {
 		log.Fatal("failed to write config: ", err)
 	}
 
-	err = run("wg", "syncconf", ifName, *cfgPath)
+	err = run("wg", "syncconf", *ifName, *cfgPath)
 	if err != nil {
 		log.Fatal("wg syncconf failed: ", err)
 	}
 
 	// sync IPs
 	if node, nodeFound := neh.nodes[*nodeName]; nodeFound {
-		iface, _ := net.InterfaceByName(ifName)
+		iface, _ := net.InterfaceByName(*ifName)
 		if iface != nil {
 			syncNodeIPs(node.PodCIDRs, iface)
 		}
@@ -149,9 +149,9 @@ func (neh *nodeEventHandler) updateWG() {
 
 			ip, _, _ := net.ParseCIDR(cidrString)
 			chkOut, _ := exec.Command("ip", "route", "get", ip.String()).Output()
-			if !bytes.Contains(chkOut, []byte(" dev "+ifName)) {
+			if !bytes.Contains(chkOut, []byte(" dev "+*ifName)) {
 				log.Print("adding ip route to ", cidrString)
-				run("ip", "route", "add", cidrString, "dev", ifName)
+				run("ip", "route", "add", cidrString, "dev", *ifName)
 			}
 		}
 	}

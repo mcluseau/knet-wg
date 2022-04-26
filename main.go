@@ -21,16 +21,16 @@ import (
 )
 
 var (
+	ifName  = flag.String("ifname", "kwg", "Wireguard interface name")
+	keyPath = flag.String("key-path", "wg.key", "path to the private key")
+	cfgPath = flag.String("config", "/etc/wireguard/kwg.cfg", "WireGuard configuration to write")
+
 	kubeconfig = flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "path to the kube-config")
 	master     = flag.String("master", "", "Master if not using the default master")
-	keyPath    = flag.String("key-path", "wg.key", "path to the private key")
-	cfgPath    = flag.String("config", "/etc/wireguard/kwg.cfg", "WireGuard configuration to write")
 	nodeName   = flag.String("node-name", func() string {
 		s, _ := os.Hostname()
 		return s
 	}(), "node name")
-
-	ifName = "kwg"
 
 	k           *kubernetes.Clientset
 	ctx, cancel = context.WithCancel(context.Background())
@@ -90,17 +90,17 @@ func main() {
 
 	// ------------------------------------------------------------------------
 
-	iface, _ := net.InterfaceByName(ifName)
+	iface, _ := net.InterfaceByName(*ifName)
 	{ // create the kwg interface
 		// err is not usable here, only an internal value is set in OpError.Err
 
 		if iface == nil {
-			log.Print("creating interface ", ifName)
-			_ = run("ip", "link", "add", ifName, "type", "wireguard")
-			iface, _ = net.InterfaceByName(ifName)
+			log.Print("creating interface ", *ifName)
+			_ = run("ip", "link", "add", *ifName, "type", "wireguard")
+			iface, _ = net.InterfaceByName(*ifName)
 		}
 
-		err = run("ip", "link", "set", ifName, "up")
+		err = run("ip", "link", "set", *ifName, "up")
 		if err != nil {
 			log.Fatal("failed to set link up: ", err)
 		}
