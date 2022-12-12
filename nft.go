@@ -9,7 +9,7 @@ import (
 
 var (
 	nftEnabled = flag.Bool("nft", false, "enable NFT basic packet filter (pods SNAT...)")
-	nftMasqOif = flag.String("nft-masq-oif", "eth0", "output interface match to masquerade (ie: \"eth0\", \"{eth0 eth1}\", etc)")
+	nftMasqOif = flag.String("nft-masq-oif", "eth0", "output interface match to masquerade (ie: \"eth0\", \"{eth0, eth1}\", etc)")
 )
 
 func setupNFT(podCIDRs []string) {
