@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -49,7 +48,7 @@ func main() {
 
 	var key wgtypes.Key
 	{ // ensure we have a key
-		keyData, err := ioutil.ReadFile(*keyPath)
+		keyData, err := os.ReadFile(*keyPath)
 		if err == nil {
 			key, err = wgtypes.ParseKey(string(keyData))
 			if err != nil {
@@ -61,7 +60,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			err = ioutil.WriteFile(*keyPath, []byte(key.String()), 0600)
+			err = os.WriteFile(*keyPath, []byte(key.String()), 0600)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -78,9 +77,9 @@ func main() {
 	}
 
 	{ // ensure the node has published its key
-		if node.Annotations[pubkeyAnnotation] != key.PublicKey().String() {
+		if annotation(node, annPubkey) != key.PublicKey().String() {
 			log.Print("setting our pubkey annotation to node")
-			node.Annotations[pubkeyAnnotation] = key.PublicKey().String()
+			node.Annotations[annPubkey] = key.PublicKey().String()
 			_, err = k.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 			if err != nil {
 				log.Fatal(err)

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -16,29 +15,35 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const pubkeyAnnotation = "kwg-pubkey"
-
 type nodeEventHandler struct {
 	hs    map[string]uint64
 	nodes map[string]nodeInfo
 }
 
 type nodeInfo struct {
-	Name     string
-	IP       string
-	IPs      []string
-	PodCIDRs []string
-	AllCIDRs []string
-	PubKey   string
+	Name      string
+	Net       string
+	IP        string
+	IPs       []string
+	PodCIDRs  []string
+	AllCIDRs  []string
+	PubKey    string
+	Endpoints map[string]string
 }
 
-func (neh *nodeEventHandler) OnAdd(obj interface{}) {
+func (neh *nodeEventHandler) OnAdd(obj any) {
 	node := obj.(*v1.Node)
 
 	ni := nodeInfo{
-		Name:     node.Name,
-		PubKey:   node.Annotations[pubkeyAnnotation],
-		PodCIDRs: node.Spec.PodCIDRs,
+		Name:      node.Name,
+		Net:       annotation(node, annNet),
+		PubKey:    annotation(node, annPubkey),
+		PodCIDRs:  node.Spec.PodCIDRs,
+		Endpoints: annotationsByPrefix(node, annEndpointFrom),
+	}
+
+	if ni.Net == "" {
+		ni.Net = "default"
 	}
 
 	ni.AllCIDRs = append(ni.AllCIDRs, ni.PodCIDRs...)
@@ -71,11 +76,11 @@ func (neh *nodeEventHandler) OnAdd(obj interface{}) {
 	neh.updateWG()
 }
 
-func (neh *nodeEventHandler) OnUpdate(oldObj, newObj interface{}) {
+func (neh *nodeEventHandler) OnUpdate(oldObj, newObj any) {
 	neh.OnAdd(newObj)
 }
 
-func (neh *nodeEventHandler) OnDelete(obj interface{}) {
+func (neh *nodeEventHandler) OnDelete(obj any) {
 	node := obj.(*v1.Node)
 
 	delete(neh.hs, node.Name)
@@ -87,7 +92,7 @@ func (neh *nodeEventHandler) OnDelete(obj interface{}) {
 func (neh *nodeEventHandler) updateWG() {
 	cfg := &bytes.Buffer{}
 
-	privateKey, err := ioutil.ReadFile(*keyPath)
+	privateKey, err := os.ReadFile(*keyPath)
 	if err != nil {
 		log.Fatal("failed to read private key: ", err)
 	}
@@ -114,12 +119,14 @@ func (neh *nodeEventHandler) updateWG() {
 		return data.Peers[i].Name < data.Peers[j].Name
 	})
 
-	tmpl.Execute(cfg, data)
+	if err := tmpl.Execute(cfg, data); err != nil {
+		log.Fatal("failed to generate config: ", err)
+	}
 
-	log.Print("new config")
+	log.Printf("new config with %d peers", len(data.Peers))
 
 	os.MkdirAll(filepath.Dir(*cfgPath), 0755)
-	err = ioutil.WriteFile(*cfgPath, cfg.Bytes(), 0600)
+	err = os.WriteFile(*cfgPath, cfg.Bytes(), 0600)
 	if err != nil {
 		log.Fatal("failed to write config: ", err)
 	}
@@ -130,14 +137,12 @@ func (neh *nodeEventHandler) updateWG() {
 	}
 
 	// sync IPs
-	if node, nodeFound := neh.nodes[*nodeName]; nodeFound {
-		iface, _ := net.InterfaceByName(*ifName)
-		if iface != nil {
-			syncNodeIPs(node.PodCIDRs, iface)
-		}
-
-		setupNFT(node.PodCIDRs)
+	iface, _ := net.InterfaceByName(*ifName)
+	if iface != nil {
+		syncNodeIPs(data.Node.PodCIDRs, iface)
 	}
+
+	setupNFT(data.Node.PodCIDRs)
 
 	// check routes exist
 	for _, node := range neh.nodes {
@@ -160,11 +165,12 @@ func (neh *nodeEventHandler) updateWG() {
 var tmpl = template.Must(template.New("wgcfg").Parse(`[Interface]
 PrivateKey = {{.PrivateKey}}
 ListenPort = 51820
+{{ $node := .Node }}
 {{ range .Peers }}{{ if .PubKey }}
 [Peer]
-# Name: {{.Name}}
-PublicKey = {{.PubKey}}
-Endpoint = {{.IP}}:51820
+# Name: {{ .Name }}
+PublicKey = {{ .PubKey }}
+Endpoint = {{ .EndpointFrom $node.Net }}
 AllowedIPs = {{ range $i, $ip := .PodCIDRs }}{{ if gt $i 0 }}, {{ end }}{{ $ip }}{{ end }}
 {{ end }}{{ end }}
 `))

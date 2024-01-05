@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -21,25 +21,25 @@ func writeCNIConfig(node *v1.Node, iface *net.Interface) {
 		return
 	}
 
-	ranges := make([][]map[string]interface{}, 0, len(node.Spec.PodCIDRs))
+	ranges := make([][]map[string]any, 0, len(node.Spec.PodCIDRs))
 	for _, cidr := range node.Spec.PodCIDRs {
-		ranges = append(ranges, []map[string]interface{}{
+		ranges = append(ranges, []map[string]any{
 			{"subnet": cidr},
 		})
 	}
 
-	ba, err := json.MarshalIndent(map[string]interface{}{
+	ba, err := json.MarshalIndent(map[string]any{
 		"cniVersion": "0.3.1",
 		"name":       "knet-wg",
 		"type":       "ptp",
-		"ipam": map[string]interface{}{
+		"ipam": map[string]any{
 			"type":   "host-local",
 			"ranges": ranges,
-			"routes": []map[string]interface{}{
+			"routes": []map[string]any{
 				{"dst": "0.0.0.0/0"},
 			},
 		},
-		"dns": map[string]interface{}{
+		"dns": map[string]any{
 			"nameservers": strings.Split(*cniDNS, ","),
 		},
 		"mtu": iface.MTU,
@@ -50,7 +50,7 @@ func writeCNIConfig(node *v1.Node, iface *net.Interface) {
 	}
 
 	log.Print("writing CNI config to ", *cniPath)
-	err = ioutil.WriteFile(*cniPath, ba, 0644)
+	err = os.WriteFile(*cniPath, ba, 0644)
 	if err != nil {
 		log.Fatal("failed to write CNI config: ", err)
 	}
