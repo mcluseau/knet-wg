@@ -9,11 +9,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"text/template"
 
 	"github.com/cespare/xxhash"
 	v1 "k8s.io/api/core/v1"
 )
+
+const defaultListenPort = 51820
 
 type nodeEventHandler struct {
 	hs    map[string]uint64
@@ -21,25 +24,36 @@ type nodeEventHandler struct {
 }
 
 type nodeInfo struct {
-	Name      string
-	Net       string
-	IP        string
-	IPs       []string
-	PodCIDRs  []string
-	AllCIDRs  []string
-	PubKey    string
-	Endpoints map[string]string
+	Name       string
+	ListenPort uint16
+	Net        string
+	IP         string
+	IPs        []string
+	PodCIDRs   []string
+	AllCIDRs   []string
+	PubKey     string
+	Endpoints  map[string]string
 }
 
 func (neh *nodeEventHandler) OnAdd(obj any) {
 	node := obj.(*v1.Node)
 
 	ni := nodeInfo{
-		Name:      node.Name,
-		Net:       annotation(node, annNet),
-		PubKey:    annotation(node, annPubkey),
-		PodCIDRs:  node.Spec.PodCIDRs,
-		Endpoints: annotationsByPrefix(node, annEndpointFrom),
+		Name:       node.Name,
+		ListenPort: defaultListenPort,
+		Net:        annotation(node, annNet),
+		PubKey:     annotation(node, annPubkey),
+		PodCIDRs:   node.Spec.PodCIDRs,
+		Endpoints:  annotationsByPrefix(node, annEndpointFrom),
+	}
+
+	if portStr := annotation(node, annListenPort); portStr != "" {
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > 0xffff {
+			log.Printf("invalid port %q on node %q", portStr, node.Name)
+		} else {
+			ni.ListenPort = uint16(port)
+		}
 	}
 
 	if ni.Net == "" {
@@ -100,15 +114,18 @@ func (neh *nodeEventHandler) updateWG() {
 	data := struct {
 		Node       nodeInfo
 		PrivateKey string
+		ListenPort uint16
 		Peers      []nodeInfo
 	}{
 		Node:       neh.nodes[*nodeName],
 		PrivateKey: string(bytes.TrimSpace(privateKey)),
+		ListenPort: defaultListenPort,
 		Peers:      make([]nodeInfo, 0, len(neh.nodes)-1),
 	}
 
 	for _, node := range neh.nodes {
 		if node.Name == *nodeName {
+			data.ListenPort = node.ListenPort
 			continue
 		}
 
@@ -164,7 +181,7 @@ func (neh *nodeEventHandler) updateWG() {
 
 var tmpl = template.Must(template.New("wgcfg").Parse(`[Interface]
 PrivateKey = {{.PrivateKey}}
-ListenPort = 51820
+ListenPort = {{.ListenPort}}
 {{ $node := .Node }}
 {{ range .Peers }}{{ if .PubKey }}
 [Peer]

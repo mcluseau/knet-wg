@@ -1,9 +1,11 @@
 package main
 
+import "strconv"
+
 func (ni nodeInfo) EndpointFrom(net string) string {
 	if ep, ok := ni.Endpoints[net]; ok {
 		return ep
 	} else {
-		return ni.IP + ":51820"
+		return ni.IP + ":" + strconv.Itoa(int(ni.ListenPort))
 	}
 }

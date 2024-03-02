@@ -1,6 +1,6 @@
-from mcluseau/golang-builder:1.21.4 as build
+from mcluseau/golang-builder:1.21.6 as build
 
-from alpine:3.18.4
+from alpine:3.19.1
 run apk add --update --no-cache wireguard-tools iproute2 nftables
 
 entrypoint ["/bin/knet-wg"]

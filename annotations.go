@@ -8,6 +8,7 @@ import (
 
 const (
 	annPrefix       = "kwg-"
+	annListenPort   = annPrefix + "listen-port"
 	annPubkey       = annPrefix + "pubkey"
 	annNet          = annPrefix + "net"
 	annEndpointFrom = annPrefix + "endpoint-from/"
