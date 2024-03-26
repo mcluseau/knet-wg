@@ -32,6 +32,7 @@ type nodeInfo struct {
 	PodCIDRs   []string
 	AllCIDRs   []string
 	PubKey     string
+	Endpoint   string
 	Endpoints  map[string]string
 }
 
@@ -44,6 +45,7 @@ func (neh *nodeEventHandler) OnAdd(obj any) {
 		Net:        annotation(node, annNet),
 		PubKey:     annotation(node, annPubkey),
 		PodCIDRs:   node.Spec.PodCIDRs,
+		Endpoint:   annotation(node, annEndpoint),
 		Endpoints:  annotationsByPrefix(node, annEndpointFrom),
 	}
 

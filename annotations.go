@@ -11,6 +11,7 @@ const (
 	annListenPort   = annPrefix + "listen-port"
 	annPubkey       = annPrefix + "pubkey"
 	annNet          = annPrefix + "net"
+	annEndpoint     = annPrefix + "endpoint"
 	annEndpointFrom = annPrefix + "endpoint-from/"
 )
 
